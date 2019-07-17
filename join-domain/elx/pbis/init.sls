@@ -16,6 +16,7 @@ PBIS-install:
   pkg.installed:
     - sources: {{ join_domain.connector_rpms|yaml }}
     - allow_updates: True
+    - skip_verify: True
 
 PBIS-NETBIOSfix:
   cmd.script:
@@ -26,14 +27,6 @@ PBIS-NETBIOSfix:
     - require:
       - pkg: PBIS-install
 
-PBIS-KillCollision:
-  cmd.script:
-    - name: 'fix-collisions.sh "{{ join_domain.dns_name }}" "{{ join_domain.username }}" "{{ join_domain.encrypted_password }}" "{{ join_domain.key }}"'
-    - source: 'salt://{{ files }}/fix-collisions.sh'
-    - cwd: '/root'
-    - stateful: True
-    - require:
-      - cmd: PBIS-NETBIOSfix
 
 PBIS-join:
   cmd.script:
@@ -42,7 +35,7 @@ PBIS-join:
     - cwd: '/root'
     - stateful: True
     - require:
-      - cmd: PBIS-KillCollision
+      - cmd: PBIS-NETBIOSfix
 
 PBIS-PamPasswordDemunge:
   cmd.script:
