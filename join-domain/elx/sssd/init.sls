@@ -22,7 +22,8 @@ fix_domain_separator:
     - sections:
         sssd:
           override_space: '^'
-
+    - require:
+      - pkg: install_sssd
 domain_defaults-{{ join_domain.dns_name }}:
   ini.options_present:
     - name: '/etc/sssd/conf.d/{{ join_domain.netbios_name }}.conf'
@@ -30,9 +31,9 @@ domain_defaults-{{ join_domain.dns_name }}:
       - pkg: install_sssd
     - sections:
         domain/{{ join_domain.dns_name }}:
-          default_shell: '/bin/bash'
+          default_shell: '{{ join_domain.login_shell }}'
           override_homedir: '{{ join_domain.login_home }}'
-          shell_fallback: '/bin/bash'
+          shell_fallback: '{{ join_domain.login_shell }}'
           use_fully_qualified_names: 'False'
 
 domain_defaults-{{ join_domain.dns_name }}_ensure_permissions:
