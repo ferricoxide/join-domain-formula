@@ -4,11 +4,13 @@ set -eu -o pipefail
 # Script to join host to domain
 #
 #################################################################
+PROGNAME="$( basename "${0}" )"
 JOIN_DOMAIN="${JOIN_DOMAIN:-UNDEF}"
 JOIN_OU="${JOIN_OU:-}"
 JOIN_USER="${JOIN_USER:-Administrator}"
 JOIN_CNAME="${JOIN_CNAME:-UNDEF}"
 PWCRYPT="${ENCRYPT_PASS:-UNDEF}"
+PWSTRNG="${PWSTRING:-}"
 PWUNLOCK="${ENCRYPT_KEY:-UNDEF}"
 CLIENT_OSNAME="$(
   awk -F "=" '/^NAME/{ print $2}' /etc/os-release |
@@ -18,6 +20,31 @@ CLIENT_OSVERS="$(
   awk -F "=" '/^VERSION_ID/{ print $2 }' /etc/os-release |
   sed 's/"//g'
 )"
+
+# Print a usage-message
+function UsageMsg {
+
+  (
+      echo "Usage: ${0} [GNU long option] [option] ..."
+      echo "  Options:"
+      printf "\t-c <ENCRYPTED_PASSWORD>  \n"
+      printf "\t-d <AD_FQDN> \n"
+      printf "\t-h print this message  \n"
+      printf "\t-k <DECRYPTION_KEY>  \n"
+      printf "\t-o <OU_PATH>  \n"
+      printf "\t-p <CLEARTEXT_PASSWORD>  \n"
+      printf "\t-u <USERNAME> \n"
+      echo "  GNU long options:"
+      printf "\t--domain-fqdn    see -d  \n"
+      printf "\t--help           see -h  \n"
+      printf "\t--join-crypt     see -c  \n"
+      printf "\t--join-key       see -k \n"
+      printf "\t--join-password  see -p \n"
+      printf "\t--join-user      see -u \n"
+      printf "\t--ou-path        see -o \n"
+  )
+  return 0
+}
 
 # Get clear-text password from crypt
 function PWdecrypt {
@@ -102,6 +129,128 @@ function JoinDomain {
 
   return 0
 }
+
+#########################
+## Main program flow...
+#########################
+
+# Define flags to look for...
+OPTIONBUFR=$(
+   getopt -o c:d:hk:o:p:u: \
+   --long help,domain-fqdn:,join-crypt:,join-key:,join-password:,join-user:,ou-path: \
+   -n "${PROGNAME}" -- "$@"
+)
+
+# Check for mutually-exclusive arguments
+if [[ ${OPTIONBUFR} =~ p\ |join-password && ${OPTIONBUFR} =~ c\ |join-crypt ]] ||
+  [[ ${OPTIONBUFR} =~ p\ |join-password && ${OPTIONBUFR} =~ c\ |join-key ]]
+then
+  EXCLUSIVEARGS=TRUE
+  UsageMsg
+fi
+
+eval set -- "${OPTIONBUFR}"
+
+###################################
+# Parse contents of ${OPTIONBUFR}
+###################################
+while true
+do
+  case "$1" in
+      -h|--help)
+        UsageMsg
+        exit
+        ;;
+      -d|--domain-fqdn)
+        case "$2" in
+            "")
+              logIt "Error: option required but not specified" 1
+              shift 2;
+              exit 1
+              ;;
+            *)
+              JOIN_DOMAIN="${2}"
+              shift 2;
+              ;;
+        esac
+        ;;
+      -u|--join-user)
+        case "$2" in
+            "")
+              logIt "Error: option required but not specified" 1
+              shift 2;
+              exit 1
+              ;;
+            *)
+              JOIN_USER="${2}"
+              shift 2;
+              ;;
+        esac
+        ;;
+      -c|--join-crypt)
+        case "$2" in
+            "")
+              logIt "Error: option required but not specified" 1
+              shift 2;
+              exit 1
+              ;;
+            *)
+              PWCRYPT="${2}"
+              PWSTRNG="TOBESET"
+              shift 2;
+              ;;
+        esac
+        ;;
+      -k|--join-key)
+        case "$2" in
+            "")
+              logIt "Error: option required but not specified" 1
+              shift 2;
+              exit 1
+              ;;
+            *)
+              PWUNLOCK="${2}"
+              shift 2;
+              ;;
+        esac
+        ;;
+      -p|--join-password)
+        case "$2" in
+            "")
+              logIt "Error: option required but not specified" 1
+              shift 2;
+              exit 1
+              ;;
+            *)
+              PWSTRNG="${2}"
+              shift 2;
+              ;;
+        esac
+        ;;
+      -o|--ou-path)
+        case "$2" in
+            "")
+              JOINOU="UNDEF"
+              shift 2;
+              ;;
+            *)
+              JOINOU="${2}"
+              JOINOU=${JOINOU// /\ }
+              shift 2;
+              ;;
+        esac
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        logIt "Missing value" 1
+        exit 1
+        ;;
+  esac
+done
+
 
 IsDiscoverable
 JoinDomain
